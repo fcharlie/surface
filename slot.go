@@ -106,7 +106,26 @@ func (a *slotAppender) formatHeader(buf *[]byte, t time.Time, prefix string, pid
 	itoa(buf, min, 2)
 	*buf = append(*buf, ':')
 	itoa(buf, sec, 2)
+
 	*buf = append(*buf, ' ')
+}
+
+func (a *slotAppender) formatHeaderAccess(buf *[]byte, t time.Time) {
+	*buf = append(*buf, '[')
+	year, month, day := t.Date()
+	itoa(buf, year, 4)
+	*buf = append(*buf, '-')
+	itoa(buf, int(month), 2)
+	*buf = append(*buf, '-')
+	itoa(buf, day, 2)
+	*buf = append(*buf, ' ')
+	hour, min, sec := t.Clock()
+	itoa(buf, hour, 2)
+	*buf = append(*buf, ':')
+	itoa(buf, min, 2)
+	*buf = append(*buf, ':')
+	itoa(buf, sec, 2)
+	*buf = append(*buf, "] "...)
 }
 
 func (a *slotAppender) writev(prefix string, s string) error {
@@ -118,6 +137,29 @@ func (a *slotAppender) writev(prefix string, s string) error {
 	defer a.mu.Unlock()
 	a.buf = a.buf[:0]
 	a.formatHeader(&a.buf, now, prefix, a.pid)
+	a.buf = append(a.buf, s...)
+	if len(s) == 0 || s[len(s)-1] != '\n' {
+		a.buf = append(a.buf, '\n')
+	}
+	if a.written >= a.MaxFileSize {
+		// TODO write a
+		a.rotate()
+		a.written = 0
+	}
+	a.written += int64(len(a.buf))
+	_, err := a.file.Write(a.buf)
+	return err
+}
+
+func (a *slotAppender) writevaccess(s string) error {
+	if a.file == nil {
+		return nil
+	}
+	now := time.Now()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.buf = a.buf[:0]
+	a.formatHeaderAccess(&a.buf, now)
 	a.buf = append(a.buf, s...)
 	if len(s) == 0 || s[len(s)-1] != '\n' {
 		a.buf = append(a.buf, '\n')
@@ -200,10 +242,10 @@ func (l *Slot) FATAL(format string, v ...interface{}) {
 	l.Output("FATAL", fmt.Sprintf(format, v...))
 }
 
-// Access logger out
+// Access logger out like nginx
 func (l *Slot) Access(format string, v ...interface{}) {
 	if l.bus != nil {
-		l.bus.writev("", fmt.Sprintf(format, v...))
+		l.bus.writevaccess(fmt.Sprintf(format, v...))
 	}
 }
 
