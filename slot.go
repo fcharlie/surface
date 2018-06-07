@@ -19,6 +19,15 @@ type slotAppender struct {
 	pid         int
 }
 
+func (a *slotAppender) close() {
+	a.mu.Lock()
+	if a.file != nil {
+		a.file.Close()
+	}
+	a.file = nil
+	a.mu.Unlock()
+}
+
 func (a *slotAppender) open() {
 	var err error
 	a.file, err = os.OpenFile(a.path, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
@@ -275,4 +284,14 @@ func (l *Slot) Initialize(af string, ef string) error {
 	l.log = newSlotAppender(ef)
 	l.bus = newSlotAppender(af)
 	return nil
+}
+
+// Close all
+func (l *Slot) Close() {
+	if l.log != nil {
+		l.log.close()
+	}
+	if l.bus != nil {
+		l.log.close()
+	}
 }
