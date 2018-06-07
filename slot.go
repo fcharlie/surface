@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -26,6 +27,25 @@ func (a *slotAppender) open() {
 	}
 }
 
+func cleanName(s string) string {
+	var v = [7]int{
+		strings.IndexByte(s, '.'),
+		strings.IndexByte(s, '-'),
+		strings.IndexByte(s, '+'),
+		strings.IndexByte(s, '_'),
+		strings.IndexByte(s, '@'),
+		strings.IndexByte(s, '('),
+		strings.IndexByte(s, ')'),
+	}
+	l := len(s)
+	for _, i := range v {
+		if i > 0 && i < l {
+			l = i
+		}
+	}
+	return s[0:l]
+}
+
 func (a *slotAppender) rotate() {
 	if a.file != nil {
 		a.file.Close()
@@ -35,7 +55,8 @@ func (a *slotAppender) rotate() {
 	base := filepath.Base(a.path)
 	ext := filepath.Ext(base)
 	name := base[0 : len(base)-len(ext)]
-	xdir := filepath.Join(dir, "old-log")
+	logdir := cleanName(name) + "-log"
+	xdir := filepath.Join(dir, logdir)
 	if _, err := os.Stat(xdir); err != nil {
 		err = os.Mkdir(xdir, 0777)
 		if err != nil {
