@@ -1,7 +1,1 @@
 package surface
-
-
-func init(){
-	
-}
-
