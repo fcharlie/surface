@@ -80,6 +80,8 @@ func (a *slotAppender) rotate() {
 	if err != nil {
 		fmt.Printf("%s\n", err)
 	}
+	a.written = 0
+	a.open()
 }
 
 func (a *slotAppender) write(s string) {
@@ -91,7 +93,6 @@ func (a *slotAppender) write(s string) {
 	if a.written >= a.MaxFileSize {
 		// TODO write a
 		a.rotate()
-		a.written = 0
 	}
 	a.written += int64(len(s))
 	a.file.WriteString(s)
@@ -174,7 +175,6 @@ func (a *slotAppender) writev(prefix string, s string) error {
 	if a.written >= a.MaxFileSize {
 		// TODO write a
 		a.rotate()
-		a.written = 0
 	}
 	a.written += int64(len(a.buf))
 	_, err := a.file.Write(a.buf)
@@ -197,7 +197,6 @@ func (a *slotAppender) writevaccess(s string) error {
 	if a.written >= a.MaxFileSize {
 		// TODO write a
 		a.rotate()
-		a.written = 0
 	}
 	a.written += int64(len(a.buf))
 	_, err := a.file.Write(a.buf)
