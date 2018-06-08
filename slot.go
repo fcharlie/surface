@@ -281,6 +281,12 @@ func (l *Slot) FATAL(format string, v ...interface{}) {
 	l.Output("FATAL", fmt.Sprintf(format, v...))
 }
 
+// Fatal like log.Fatal
+func (l *Slot) Fatal(v ...interface{}) {
+	l.Output("Quit: ", fmt.Sprint(v...))
+	os.Exit(1)
+}
+
 // Access logger out like nginx
 func (l *Slot) Access(format string, v ...interface{}) {
 	if l.bus != nil {
