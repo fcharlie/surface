@@ -236,10 +236,25 @@ func newSlotAppender(f string) *slotAppender {
 	return a
 }
 
+// Level is logger
+type Level int
+
+const (
+	// DEBUG value
+	DEBUG Level = iota // value 0
+	// INFO value
+	INFO
+	// ERROR value
+	ERROR
+	// FATAL value
+	FATAL
+)
+
 // Slot todo
 type Slot struct {
-	log *slotAppender
-	bus *slotAppender
+	level Level
+	log   *slotAppender
+	bus   *slotAppender
 }
 
 // RolateSize to
@@ -263,7 +278,9 @@ func (l *Slot) Output(prefix string, s string) error {
 
 // DEBUG logger out
 func (l *Slot) DEBUG(format string, v ...interface{}) {
-	l.Output("DEBUG", fmt.Sprintf(format, v...))
+	if l.level <= DEBUG {
+		l.Output("DEBUG", fmt.Sprintf(format, v...))
+	}
 }
 
 // INFO logger out
@@ -298,7 +315,13 @@ func (l *Slot) Access(format string, v ...interface{}) {
 func (l *Slot) Initialize(af string, ef string) error {
 	l.log = newSlotAppender(ef)
 	l.bus = newSlotAppender(af)
+	l.level = DEBUG
 	return nil
+}
+
+// Level log level
+func (l *Slot) Level(lv Level) {
+	l.level = lv
 }
 
 // Close all
