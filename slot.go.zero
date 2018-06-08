@@ -16,7 +16,6 @@ type slotAppender struct {
 	file        *os.File
 	mu          sync.Mutex
 	written     int64
-	buf         []byte
 	writer      *bufio.Writer
 	pid         int
 }
@@ -106,7 +105,7 @@ func (a *slotAppender) write(s string) {
 }
 
 // Cheap integer to fixed-width decimal ASCII. Give a negative width to avoid zero-padding.
-func itoa(buf *[]byte, i int, wid int) {
+func (a *slotAppender) itoa(i int, wid int) {
 	// Assemble decimal in reverse order.
 	var b [20]byte
 	bp := len(b) - 1
@@ -119,51 +118,50 @@ func itoa(buf *[]byte, i int, wid int) {
 	}
 	// i < 10
 	b[bp] = byte('0' + i)
-	*buf = append(*buf, b[bp:]...)
+	a.writer.Write(b[bp:])
 }
 
 // formatHeader writes log header to buf in following order:
-func (a *slotAppender) formatHeader(buf *[]byte, t time.Time, prefix string, pid int) {
-	*buf = append(*buf, '[')
+func (a *slotAppender) formatHeader(t time.Time, prefix string, pid int) {
+	a.writer.WriteByte('[')
 	if len(prefix) != 0 {
-		*buf = append(*buf, prefix...)
-		*buf = append(*buf, "] ["...)
+		a.writer.WriteString(prefix)
+		a.writer.WriteString("] [")
 	}
-	itoa(buf, pid, -1)
-	*buf = append(*buf, "] "...)
+	a.itoa(pid, -1)
+	a.writer.WriteString("] ")
 	year, month, day := t.Date()
-	itoa(buf, year, 4)
-	*buf = append(*buf, '-')
-	itoa(buf, int(month), 2)
-	*buf = append(*buf, '-')
-	itoa(buf, day, 2)
-	*buf = append(*buf, ' ')
+	a.itoa(year, 4)
+	a.writer.WriteByte('-')
+	a.itoa(int(month), 2)
+	a.writer.WriteByte('-')
+	a.itoa(day, 2)
+	a.writer.WriteByte(' ')
 	hour, min, sec := t.Clock()
-	itoa(buf, hour, 2)
-	*buf = append(*buf, ':')
-	itoa(buf, min, 2)
-	*buf = append(*buf, ':')
-	itoa(buf, sec, 2)
-
-	*buf = append(*buf, ' ')
+	a.itoa(hour, 2)
+	a.writer.WriteByte(':')
+	a.itoa(min, 2)
+	a.writer.WriteByte(':')
+	a.itoa(sec, 2)
+	a.writer.WriteByte(' ')
 }
 
-func (a *slotAppender) formatHeaderAccess(buf *[]byte, t time.Time) {
-	*buf = append(*buf, '[')
+func (a *slotAppender) formatHeaderAccess(t time.Time) {
+	a.writer.WriteByte('[')
 	year, month, day := t.Date()
-	itoa(buf, year, 4)
-	*buf = append(*buf, '-')
-	itoa(buf, int(month), 2)
-	*buf = append(*buf, '-')
-	itoa(buf, day, 2)
-	*buf = append(*buf, ' ')
+	a.itoa(year, 4)
+	a.writer.WriteByte('-')
+	a.itoa(int(month), 2)
+	a.writer.WriteByte('-')
+	a.itoa(day, 2)
+	a.writer.WriteByte(' ')
 	hour, min, sec := t.Clock()
-	itoa(buf, hour, 2)
-	*buf = append(*buf, ':')
-	itoa(buf, min, 2)
-	*buf = append(*buf, ':')
-	itoa(buf, sec, 2)
-	*buf = append(*buf, "] "...)
+	a.itoa(hour, 2)
+	a.writer.WriteByte(':')
+	a.itoa(min, 2)
+	a.writer.WriteByte(':')
+	a.itoa(sec, 2)
+	a.writer.WriteString("] ")
 }
 
 func (a *slotAppender) writev(prefix string, s string) error {
@@ -173,20 +171,19 @@ func (a *slotAppender) writev(prefix string, s string) error {
 	now := time.Now()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.buf = a.buf[:0]
-	a.formatHeader(&a.buf, now, prefix, a.pid)
-	a.buf = append(a.buf, s...)
+	prelen := a.writer.Buffered()
+	a.formatHeader(now, prefix, a.pid)
+	a.writer.WriteString(s)
 	if len(s) == 0 || s[len(s)-1] != '\n' {
-		a.buf = append(a.buf, '\n')
+		a.writer.WriteByte('\n')
 	}
 	if a.written >= a.MaxFileSize {
 		// TODO write a
 		a.writer.Flush()
 		a.rotate()
 	}
-	a.written += int64(len(a.buf))
-	_, err := a.writer.Write(a.buf)
-	return err
+	a.written += int64(a.writer.Buffered() - prelen)
+	return nil
 }
 
 func (a *slotAppender) writevaccess(s string) error {
@@ -196,20 +193,19 @@ func (a *slotAppender) writevaccess(s string) error {
 	now := time.Now()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.buf = a.buf[:0]
-	a.formatHeaderAccess(&a.buf, now)
-	a.buf = append(a.buf, s...)
+	prelen := a.writer.Buffered()
+	a.formatHeaderAccess(now)
+	a.writer.WriteString(s)
 	if len(s) == 0 || s[len(s)-1] != '\n' {
-		a.buf = append(a.buf, '\n')
+		a.writer.WriteByte('\n')
 	}
 	if a.written >= a.MaxFileSize {
 		// TODO write a
 		a.writer.Flush()
 		a.rotate()
 	}
-	a.written += int64(len(a.buf))
-	_, err := a.writer.Write(a.buf)
-	return err
+	a.written += int64(a.writer.Buffered() - prelen)
+	return nil
 }
 
 func (a *slotAppender) changeSize(sz int64) {
