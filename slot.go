@@ -166,7 +166,7 @@ func (a *slotAppender) formatHeaderAccess(buf *[]byte, t time.Time) {
 	*buf = append(*buf, "] "...)
 }
 
-func (a *slotAppender) writev(prefix string, s string) error {
+func (a *slotAppender) writev(flush bool, prefix string, s string) error {
 	if a.file == nil {
 		return nil
 	}
@@ -186,6 +186,9 @@ func (a *slotAppender) writev(prefix string, s string) error {
 	}
 	a.written += int64(len(a.buf))
 	_, err := a.writer.Write(a.buf)
+	if flush {
+		a.writer.Flush()
+	}
 	return err
 }
 
@@ -268,10 +271,10 @@ func (l *Slot) RolateSize(sz int64) {
 }
 
 // Output logger
-func (l *Slot) Output(prefix string, s string) error {
+func (l *Slot) Output(flush bool, prefix string, s string) error {
 	//now := time.Now()
 	if l.log != nil {
-		return l.log.writev(prefix, s)
+		return l.log.writev(flush, prefix, s)
 	}
 	return nil
 }
@@ -279,28 +282,28 @@ func (l *Slot) Output(prefix string, s string) error {
 // DEBUG logger out
 func (l *Slot) DEBUG(format string, v ...interface{}) {
 	if l.level <= DEBUG {
-		l.Output("DEBUG", fmt.Sprintf(format, v...))
+		l.Output(false, "DEBUG", fmt.Sprintf(format, v...))
 	}
 }
 
 // INFO logger out
 func (l *Slot) INFO(format string, v ...interface{}) {
-	l.Output("INFO", fmt.Sprintf(format, v...))
+	l.Output(false, "INFO", fmt.Sprintf(format, v...))
 }
 
 // ERROR logger out
 func (l *Slot) ERROR(format string, v ...interface{}) {
-	l.Output("ERROR", fmt.Sprintf(format, v...))
+	l.Output(true, "ERROR", fmt.Sprintf(format, v...))
 }
 
 // FATAL logger out
 func (l *Slot) FATAL(format string, v ...interface{}) {
-	l.Output("FATAL", fmt.Sprintf(format, v...))
+	l.Output(true, "FATAL", fmt.Sprintf(format, v...))
 }
 
 // Fatal like log.Fatal
 func (l *Slot) Fatal(v ...interface{}) {
-	l.Output("Quit: ", fmt.Sprint(v...))
+	l.Output(true, "Quit: ", fmt.Sprint(v...))
 	os.Exit(1)
 }
 
